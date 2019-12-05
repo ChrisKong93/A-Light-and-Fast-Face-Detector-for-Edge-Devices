@@ -226,7 +226,8 @@ class Predict(object):
 
 def run_prediction_folder():
     sys.path.append('..')
-    from config_farm import configuration_10_560_25L_8scales_v1 as cfg
+    # from config_farm import configuration_10_560_25L_8scales_v1 as cfg
+    from config_farm import configuration_10_320_25L_5scales_v2 as cfg
     import mxnet
 
     debug_folder = '' # fill the folder that contains images
@@ -249,7 +250,7 @@ def run_prediction_folder():
         im = cv2.imread(os.path.join(debug_folder, file_name))
 
         bboxes = my_predictor.predict(im, resize_scale=1, score_threshold=0.3, top_k=10000, NMS_threshold=0.3, NMS_flag=True, skip_scale_branch_list=[])
-        for bbox in bboxes:
+        for bbox in bboxes[0]:
             cv2.rectangle(im, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
 
         if max(im.shape[:2]) > 1600:
@@ -259,6 +260,45 @@ def run_prediction_folder():
         cv2.waitKey()
         # cv2.imwrite(os.path.join(debug_folder, file_name.replace('.jpg','_result.jpg')), im)
 
+def test():
+    sys.path.append('..')
+    from config_farm import configuration_10_560_25L_8scales_v1 as cfg
+    import mxnet
+
+    capture = cv2.VideoCapture(0)
+
+    symbol_file_path = '../symbol_farm/symbol_10_560_25L_8scales_v1_deploy.json'
+    model_file_path = '../saved_model/configuration_10_560_25L_8scales_v1/train_10_560_25L_8scales_v1_iter_1400000.params'
+    my_predictor = Predict(mxnet=mxnet,
+                           symbol_file_path=symbol_file_path,
+                           model_file_path=model_file_path,
+                           ctx=mxnet.gpu(0),
+                           receptive_field_list=cfg.param_receptive_field_list,
+                           receptive_field_stride=cfg.param_receptive_field_stride,
+                           bbox_small_list=cfg.param_bbox_small_list,
+                           bbox_large_list=cfg.param_bbox_large_list,
+                           receptive_field_center_start=cfg.param_receptive_field_center_start,
+                           num_output_scales=cfg.param_num_output_scales)
+    while True:
+        starttime = time.time()
+        ret, frame = capture.read()
+        rgb_frame = frame
+        # rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        bboxes = my_predictor.predict(rgb_frame, resize_scale=1, score_threshold=0.3, top_k=10000, NMS_threshold=0.3,
+                                      NMS_flag=True, skip_scale_branch_list=[])
+        # print(bboxes)
+        for bbox in bboxes[0]:
+            print(bbox)
+            cv2.rectangle(rgb_frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0, 255, 0), 2)
+
+        if max(rgb_frame.shape[:2]) > 1600:
+            scale = 1600 / max(rgb_frame.shape[:2])
+            rgb_frame = cv2.resize(rgb_frame, (0, 0), fx=scale, fy=scale)
+        cv2.imshow('im', rgb_frame)
+        cv2.waitKey(1)
+        stoptime = time.time()
+        print('usetime:', str(stoptime - starttime))
 
 if __name__ == '__main__':
-    run_prediction_folder()
+    # run_prediction_folder()
+    test()
